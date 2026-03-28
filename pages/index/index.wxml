@@ -1,0 +1,2 @@
+<!-- 使用 web-view 组件加载你的 React 应用 -->
+<web-view src="{{url}}"></web-view>

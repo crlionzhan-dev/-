@@ -1,0 +1,172 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (UID)
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string (optional)
+    //   - spaceId: string (optional)
+    //   - updatedAt: string (required)
+    //
+    // Collection: joinRequests
+    // Document ID: requestId
+    // Fields:
+    //   - id: string (required)
+    //   - uid: string (required)
+    //   - displayName: string (required)
+    //   - spaceId: string (required)
+    //   - status: string (required) - 'pending', 'approved', 'rejected'
+    //   - createdAt: string (required)
+    //
+    // Collection: spaces
+    // Document ID: spaceId (6-digit code)
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - createdAt: string (required)
+    //
+    // Collection: dishes
+    // Document ID: dishId
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - intro: string (optional)
+    //   - ingredients: list (optional)
+    //   - tags: list (optional)
+    //   - imageUrl: string (optional)
+    //   - spaceId: string (required)
+    //   - createdAt: string (required)
+    //
+    // Collection: orders
+    // Document ID: orderId
+    // Fields:
+    //   - id: string (required)
+    //   - dishIds: list (required)
+    //   - orderTime: string (required)
+    //   - notes: string (optional)
+    //   - userName: string (required)
+    //   - spaceId: string (required)
+    //   - createdAt: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasSpaceAccess(spaceId) {
+      return isAuthenticated() && getUserData().spaceId == spaceId;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'updatedAt']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.updatedAt is string;
+    }
+
+    function isValidJoinRequest(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'spaceId', 'status', 'createdAt']) &&
+             data.uid is string &&
+             data.displayName is string &&
+             data.spaceId is string &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             data.createdAt is string;
+    }
+
+    function isValidSpace(data) {
+      return data.keys().hasAll(['id', 'name', 'createdAt']) &&
+             data.id is string &&
+             data.name is string &&
+             data.name.size() > 0 && data.name.size() < 100 &&
+             data.createdAt is string;
+    }
+
+    function isValidDish(data) {
+      return data.keys().hasAll(['name', 'spaceId', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.spaceId is string &&
+             data.createdAt is string &&
+             (!('intro' in data) || (data.intro is string && data.intro.size() < 1000)) &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 2000)) &&
+             (!('ingredients' in data) || data.ingredients is list) &&
+             (!('tags' in data) || data.tags is list);
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['dishIds', 'orderTime', 'spaceId', 'createdAt']) &&
+             data.dishIds is list &&
+             data.orderTime is string &&
+             data.spaceId is string &&
+             data.createdAt is string &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 1000)) &&
+             (!('userName' in data) || (data.userName is string && data.userName.size() < 100));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Allow reading own profile or listing users in the same space
+      allow read: if isOwner(userId) || (isAuthenticated() && resource.data.spaceId == getUserData().spaceId);
+      allow list: if isAuthenticated() && request.query.limit <= 100; // Simplified for member count
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+    }
+
+    match /joinRequests/{requestId} {
+      // Allow reading if owner of request or space member
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || hasSpaceAccess(resource.data.spaceId));
+      allow list: if isAuthenticated(); // Queries will be filtered by spaceId or uid
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid && isValidJoinRequest(request.resource.data);
+      allow update: if isAuthenticated() && (
+        (request.resource.data.uid == request.auth.uid && request.resource.data.status == resource.data.status) || // Owner can't change status
+        (hasSpaceAccess(resource.data.spaceId) && request.resource.data.status in ['approved', 'rejected']) // Space member can approve/reject
+      ) && isValidJoinRequest(request.resource.data);
+    }
+
+    match /spaces/{spaceId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidSpace(request.resource.data);
+      allow update: if isAuthenticated() && isValidSpace(request.resource.data);
+    }
+
+    match /dishes/{dishId} {
+      allow read: if isAuthenticated() && hasSpaceAccess(resource.data.spaceId);
+      allow create: if isAuthenticated() && hasSpaceAccess(request.resource.data.spaceId) && isValidDish(request.resource.data);
+      allow update: if isAuthenticated() && hasSpaceAccess(resource.data.spaceId) && hasSpaceAccess(request.resource.data.spaceId) && isValidDish(request.resource.data);
+      allow delete: if isAuthenticated() && hasSpaceAccess(resource.data.spaceId);
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && hasSpaceAccess(resource.data.spaceId);
+      allow create: if isAuthenticated() && hasSpaceAccess(request.resource.data.spaceId) && isValidOrder(request.resource.data);
+      allow update: if isAuthenticated() && hasSpaceAccess(resource.data.spaceId) && hasSpaceAccess(request.resource.data.spaceId) && isValidOrder(request.resource.data);
+      allow delete: if isAuthenticated() && hasSpaceAccess(resource.data.spaceId);
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "entities": {
+    "Dish": {
+      "title": "Dish",
+      "description": "A recipe or dish entered by the user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "intro": { "type": "string" },
+        "ingredients": { "type": "array", "items": { "type": "string" } },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "imageUrl": { "type": "string" },
+        "spaceId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "spaceId", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A record of a meal or order.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "dishIds": { "type": "array", "items": { "type": "string" } },
+        "orderTime": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string" },
+        "userName": { "type": "string" },
+        "spaceId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["dishIds", "orderTime", "spaceId", "createdAt"]
+    },
+    "Space": {
+      "title": "Space",
+      "description": "A shared space for two people.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and space association.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "spaceId": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "JoinRequest": {
+      "title": "JoinRequest",
+      "description": "A request to join a space.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "spaceId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "spaceId", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/spaces/{spaceId}": {
+      "schema": "Space",
+      "description": "Shared spaces."
+    },
+    "/dishes/{dishId}": {
+      "schema": "Dish",
+      "description": "All dishes across all spaces."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "All orders across all spaces."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles."
+    },
+    "/joinRequests/{requestId}": {
+      "schema": "JoinRequest",
+      "description": "Join requests for spaces."
+    }
+  }
+}

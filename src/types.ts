@@ -24,3 +24,20 @@ export interface Space {
   name: string;
   createdAt: string;
 }
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  spaceId?: string;
+  updatedAt: string;
+}
+
+export interface JoinRequest {
+  id: string;
+  uid: string;
+  displayName: string;
+  spaceId: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}

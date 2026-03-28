@@ -56,8 +56,8 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
       if (firebaseUser) {
+        setUser(firebaseUser);
         // Fetch or create profile
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
         if (userDoc.exists()) {
@@ -66,16 +66,22 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const newProfile: UserProfile = {
             uid: firebaseUser.uid,
             email: firebaseUser.email || '',
-            displayName: firebaseUser.displayName || '',
+            displayName: firebaseUser.displayName || '美食家',
             updatedAt: new Date().toISOString()
           };
           await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
           setProfile(newProfile);
         }
+        setLoading(false);
       } else {
-        setProfile(null);
+        // Silent anonymous login
+        try {
+          await loginAnonymously();
+        } catch (e) {
+          console.error('Silent login failed', e);
+          setLoading(false);
+        }
       }
-      setLoading(false);
     });
     return unsubscribe;
   }, []);
@@ -117,60 +123,25 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 // --- Components ---
 
 const LoginView = () => {
-  const { signIn } = useAuth();
-  const [nickname, setNickname] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleLogin = async () => {
-    if (!nickname.trim()) return;
-    setLoading(true);
-    await signIn(nickname);
-    setLoading(false);
-  };
-
   return (
     <div className="min-h-screen bg-[#f7f7f7] flex flex-col items-center justify-center p-6 text-center">
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="bg-white p-10 rounded-[48px] shadow-xl border border-gray-100 max-w-sm w-full"
+        className="flex flex-col items-center"
       >
-        <div className="w-20 h-20 bg-orange-50 text-orange-500 rounded-[28px] flex items-center justify-center mx-auto mb-8">
+        <div className="w-20 h-20 bg-orange-50 text-orange-500 rounded-[28px] flex items-center justify-center mb-8">
           <ShoppingCart size={40} />
         </div>
         <h1 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">双人食记</h1>
-        <p className="text-gray-400 font-bold text-sm mb-10">记录属于你们的每一顿美味</p>
-        
-        <div className="space-y-4 mb-8">
-          <div className="bg-gray-50 p-4 rounded-2xl border-2 border-gray-100 text-left">
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">你的昵称</label>
-            <input 
-              type="text"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-              placeholder="怎么称呼你？"
-              className="w-full bg-transparent border-none focus:outline-none text-lg font-bold text-gray-800"
-            />
-          </div>
+        <div className="mt-8 flex items-center gap-2 text-gray-400 font-bold">
+          <motion.div 
+            animate={{ rotate: 360 }} 
+            transition={{ repeat: Infinity, duration: 1, ease: "linear" }} 
+            className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full" 
+          />
+          正在开启美食空间...
         </div>
-
-        <button
-          onClick={handleLogin}
-          disabled={loading || !nickname.trim()}
-          className="w-full bg-[#07C160] text-white py-4 rounded-2xl font-black flex items-center justify-center gap-3 active:scale-95 transition-transform shadow-lg shadow-green-100 disabled:opacity-50"
-        >
-          {loading ? (
-            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-6 h-6 border-2 border-white border-t-transparent rounded-full" />
-          ) : (
-            <>
-              <LogIn size={20} /> 微信一键登录
-            </>
-          )}
-        </button>
-        
-        <p className="mt-8 text-[10px] text-gray-300 font-bold uppercase tracking-widest">
-          开启你们的共享美食空间
-        </p>
       </motion.div>
     </div>
   );

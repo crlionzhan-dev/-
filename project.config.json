@@ -11,6 +11,7 @@
     "minified": true
   },
   "compileType": "miniprogram",
+  "miniprogramRoot": "./",
   "libVersion": "latest",
   "appid": "touristappid",
   "projectname": "food-space-mp",
